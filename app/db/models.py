@@ -1,6 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Date, Integer
-from sqlalchemy.dialects.postgresql import UUID, VECTOR
+from sqlalchemy.dialects.postgresql import UUID 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -94,7 +95,7 @@ class Embedding(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chunk_id = Column(Integer, nullable=True)
-    vector = Column(VECTOR(1536))  # requires pgvector extension
+    vector = Column(Vector(1536))  # Capital 'V' is correct here.
     created_at = Column(DateTime, default=datetime.utcnow)
 
     paper_id = Column(UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"))
