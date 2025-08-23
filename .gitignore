@@ -34,8 +34,9 @@ node_modules/
 dist/
 *.log
 
-*.pyc
-__pycache__/
 .env
 .venv/
 311.pyc
+
+__pycache__/
+*.pyc
