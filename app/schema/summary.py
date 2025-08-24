@@ -8,7 +8,9 @@ class SummaryBase(BaseModel):
     content: str
 
 class SummaryCreate(SummaryBase):
+    id: uuid.UUID          
     paper_id: uuid.UUID
+    created_at: Optional[datetime] = None 
 
 class Summary(SummaryBase):
     id: uuid.UUID
