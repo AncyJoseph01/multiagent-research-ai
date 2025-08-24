@@ -55,7 +55,11 @@ async def create_paper(paper: PaperCreate):
 async def read_papers():
     query = select(models.Paper)
     rows = await database.fetch_all(query)
-    return rows
+    
+    # Create a list of Paper Pydantic models from the fetched rows
+    papers = [Paper.model_validate(row) for row in rows]
+    
+    return papers
 
 
 # Get a paper by ID

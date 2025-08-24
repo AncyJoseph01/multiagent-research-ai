@@ -5,7 +5,7 @@ import uuid
 
 class EmbeddingBase(BaseModel):
     chunk_id: Optional[int] = None
-    vector: List[float]  # pydantic will handle this as a list of floats
+    vector: List[float]
 
 class EmbeddingCreate(EmbeddingBase):
     paper_id: uuid.UUID
