@@ -1,20 +1,23 @@
 from fastapi import FastAPI
-from app.core.config import settings
+from app.db.database import database
+from app.api import users, papers, summaries, tasks, events, history, embeddings
 
-app = FastAPI(
-    title="Multiagent Research AI",
-    version="0.1.0",
-)
+app = FastAPI()
 
-
+# Startup and shutdown events
 @app.on_event("startup")
-async def startup_event():
-    print("✅ App started with settings:")
+async def startup():
+    await database.connect()
 
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
 
-@app.get("/")
-def read_root():
-    return {
-        "message": "Welcome to Multiagent Research AI ",
-        "database_url": settings.DATABASE_URL,  
-    }
+# Include routers
+app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(papers.router, prefix="/papers", tags=["papers"])
+app.include_router(summaries.router, prefix="/summaries", tags=["summaries"])
+app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+app.include_router(events.router, prefix="/events", tags=["events"])
+app.include_router(history.router, prefix="/history", tags=["history"])
+app.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
