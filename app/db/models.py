@@ -95,7 +95,7 @@ class Embedding(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chunk_id = Column(Integer, nullable=True)
-    vector = Column(Vector(1536))  # Capital 'V' is correct here.
+    vector = Column(Vector(768))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     paper_id = Column(UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"))

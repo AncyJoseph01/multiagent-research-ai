@@ -6,7 +6,7 @@ from sqlalchemy import insert, select, update, delete
 
 from app.db.database import database
 from app.db import models
-from app.schema.summary import Summary, SummaryCreate
+from app.schema.summary import Summary, SummaryCreate, Summary as SummarySchema
 
 router = APIRouter()
 
@@ -104,3 +104,20 @@ async def delete_summary(summary_id: uuid.UUID):
     await database.execute(q)
 
     return {"message": "Summary deleted successfully"}
+
+@router.get("/papers/{paper_id}", response_model=List[SummarySchema])
+async def get_summaries_for_paper(paper_id: uuid.UUID):
+    """
+    Retrieves all summaries associated with a specific paper ID.
+    
+    This endpoint queries the 'summaries' table using the paper_id foreign key.
+    """
+    query = select(models.Summary).where(models.Summary.paper_id == paper_id)
+    summaries = await database.fetch_all(query)
+    
+    if not summaries:
+        raise HTTPException(
+            status_code=404, detail=f"No summaries found for paper_id: {paper_id}"
+        )
+        
+    return summaries
