@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # For a simple MVP, let's use a placeholder user ID. In a real app, this would come from authentication.
-MOCK_USER_ID = uuid.UUID("938b9f29-8e79-4dc1-a6b3-4ea1963bdc10")
+MOCK_USER_ID = uuid.UUID("bc3283ba-3093-423d-94a4-6482fddd27ff")
 
 async def process_and_save_paper(
     title: str,
@@ -36,11 +36,12 @@ async def process_and_save_paper(
     user_id: uuid.UUID
 ) -> PaperSchema:
     """Helper function to process and save a paper, its summary, and embeddings."""
+    paper_id = uuid.uuid4()
+    now = datetime.utcnow()
     try:
         logger.info(f"Starting to process paper: {title}")
 
         # Save paper metadata
-        paper_id = uuid.uuid4()
         paper_data = {
             "id": paper_id,
             "title": title,
@@ -49,45 +50,41 @@ async def process_and_save_paper(
             "arxiv_id": arxiv_id,
             "url": url,
             "published_at": published_at,
-            "created_at": datetime.utcnow(),
+            "created_at": now,
             "user_id": user_id,
         }
         await database.execute(insert(Paper).values(**paper_data))
         logger.info(f"Saved paper metadata with ID: {paper_id}")
 
+        # Summarise and save content
         logger.info("Calling summarisation service...")
         summary_content = summariser_service.summarise_text(content)
         
-    
-        summary_id = uuid.uuid4()
-        
-        summary_data = SummaryCreate(
-            id=summary_id,  
-            paper_id=paper_id,
-            summary_type="structured",
-            content=summary_content,
-            created_at=datetime.utcnow(),
-        )
-        await database.execute(insert(Summary).values(summary_data.model_dump()))
+        summary_data = {
+            "id": uuid.uuid4(),  
+            "paper_id": paper_id,
+            "summary_type": "structured",
+            "content": summary_content,
+            "created_at": now, 
+        }
+        await database.execute(insert(Summary).values(summary_data))
         logger.info("Saved structured summary.")
 
-        logger.info("Generating and saving embeddings...")
-        embedding_vector = embedding_service.create_embedding(content)
-        embedding_data = EmbeddingCreate(
-            paper_id=paper_id,
-            chunk_id=0,
-            vector=embedding_vector,
-        )
-        await database.execute(insert(Embedding).values(embedding_data.model_dump()))
-        logger.info("Embeddings saved successfully.")
+        # --- CORRECT CODE FOR CHUNKING AND EMBEDDING ---
+        logger.info("Splitting content into chunks for embedding.")
+        chunks = pdf_service.split_text_into_chunks(content)
 
-        logger.info(f"Finished processing paper: {title}")
+        logger.info(f"Creating and saving embeddings for {len(chunks)} chunks.")
+        await embedding_service.create_and_save_embeddings(paper_id, chunks)
+
+        logger.info("Finished processing.")
+        
         return PaperSchema(**paper_data)
     except Exception as e:
         logger.error(f"Failed to process paper: {title}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to process paper: {str(e)}")
 
-
+# This endpoint handles all ArXiv requests
 @router.post("/papers/arxiv", response_model=List[PaperSchema])
 async def fetch_and_summarise_arxiv_papers(keyword: str, max_results: int = 5):
     """Fetches papers from Arxiv, summarises them, and stores the results."""
@@ -99,6 +96,22 @@ async def fetch_and_summarise_arxiv_papers(keyword: str, max_results: int = 5):
     saved_papers = []
     for paper in papers_metadata:
         try:
+            logger.info(f"Processing paper: {paper['title']}")
+            
+            # Step 1: Download the full PDF content
+            # The 'arxiv_service' must have a 'download_pdf_content' function
+            pdf_content = await arxiv_service.download_pdf_content(paper["pdf_url"])
+            if not pdf_content:
+                logger.warning(f"Skipping paper due to PDF download failure: {paper['title']}")
+                continue
+
+            # Step 2: Extract text from the downloaded PDF
+            extracted_text = pdf_service.extract_pdf_text(pdf_content)
+            if not extracted_text or extracted_text.isspace():
+                logger.warning(f"Skipping paper due to empty or unreadable text: {paper['title']}")
+                continue
+
+            # Step 3: Process and save the paper using the full text
             processed_paper = await process_and_save_paper(
                 title=paper["title"],
                 abstract=paper["abstract"],
@@ -106,48 +119,20 @@ async def fetch_and_summarise_arxiv_papers(keyword: str, max_results: int = 5):
                 arxiv_id=paper["arxiv_id"],
                 url=paper["url"],
                 published_at=paper["published_at"],
-                content=paper["abstract"],
+                content=extracted_text,
                 user_id=MOCK_USER_ID,
             )
             saved_papers.append(processed_paper)
-        except HTTPException:
-            pass
+            logger.info(f"Successfully processed and saved paper: {paper['title']}")
 
+        except HTTPException as e:
+            logger.error(f"HTTPException processing Arxiv paper: {paper.get('title', 'Unknown')}", exc_info=True)
+            # Re-raise HTTPException to show the user a proper error
+            raise e
+        except Exception as e:
+            logger.error(f"Failed to process Arxiv paper: {paper.get('title', 'Unknown')}", exc_info=True)
+            # You can decide to re-raise or just log and continue
+            continue # This will skip the current paper and move to the next
+    
     logger.info("Finished processing all Arxiv papers.")
     return saved_papers
-
-
-@router.post("/papers/upload", response_model=PaperSchema)
-async def upload_and_summarise_pdf(
-    file: UploadFile = File(...),
-):
-    """Extracts text from a PDF, summarises it, and stores the results."""
-    logger.info(f"Received request to upload PDF file: {file.filename}")
-
-    if file.content_type != "application/pdf":
-        logger.warning(f"Invalid file type uploaded: {file.content_type}")
-        raise HTTPException(
-            status_code=400, detail="Invalid file type. Only PDF files are supported."
-        )
-
-    try:
-        logger.info("Reading and extracting text from PDF.")
-        file_content = await file.read()
-        extracted_text = pdf_service.extract_pdf_text(file_content)
-
-        paper_title = file.filename or "Uploaded PDF"
-        processed_paper = await process_and_save_paper(
-            title=paper_title,
-            abstract=extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
-            authors="N/A",
-            arxiv_id=None,
-            url=None,
-            published_at=date.today(),
-            content=extracted_text,
-            user_id=MOCK_USER_ID,
-        )
-        logger.info("Finished processing PDF upload.")
-        return processed_paper
-    except Exception as e:
-        logger.error("Failed to process PDF upload.", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")

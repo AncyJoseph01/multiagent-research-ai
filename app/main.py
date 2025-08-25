@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.db.database import database
-from app.api import users, papers, summaries, tasks, events, history, embeddings, research
+from app.api import arivx_research, users, papers, summaries, tasks, events, history, embeddings
+from app.api import pdf_research
 
 app = FastAPI()
 
@@ -21,4 +22,5 @@ app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(events.router, prefix="/events", tags=["events"])
 app.include_router(history.router, prefix="/history", tags=["history"])
 app.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
-app.include_router(research.router, prefix="/research", tags=["research"])
+app.include_router(arivx_research.router, prefix="/research", tags=["arivx_research"])
+app.include_router(pdf_research.router, prefix="/pdf_research", tags=["PDF_research"])
