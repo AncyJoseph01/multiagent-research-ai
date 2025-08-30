@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# For a simple MVP, let's use a placeholder user ID. In a real app, this would come from authentication.
 MOCK_USER_ID = uuid.UUID("bc3283ba-3093-423d-94a4-6482fddd27ff")
 
 async def process_and_save_paper(
