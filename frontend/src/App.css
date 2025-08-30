@@ -69,3 +69,28 @@
   font-size: 0.9rem;
   color: #65676b;
 }
+
+.login-page {
+  height: 100vh;             /* fill the viewport */
+  width: 100%;
+  overflow: hidden;          /* prevent page scrolling */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* header at top, footer at bottom, form in middle */
+  align-items: center;
+  box-sizing: border-box;
+  padding: 1rem;
+}
+
+.login-page .main {
+  flex: 1;                   /* main section takes remaining space */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.login-page header,
+.login-page footer {
+  flex-shrink: 0;            /* prevent header/footer from shrinking */
+}

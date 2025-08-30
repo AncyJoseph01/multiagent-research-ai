@@ -2,8 +2,17 @@ from fastapi import FastAPI
 from app.db.database import database
 from app.api import arivx_research, users, papers, summaries, tasks, events, history, embeddings
 from app.api import pdf_research
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Startup and shutdown events
 @app.on_event("startup")
