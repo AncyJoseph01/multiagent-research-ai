@@ -14,5 +14,8 @@ class User(UserBase):
     id: uuid.UUID
     created_at: datetime
 
+class LoginRequest(BaseModel):
+    email: str
+
     class Config:
         from_attributes = True
