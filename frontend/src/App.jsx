@@ -1,24 +1,36 @@
-import { useState } from 'react'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import PrivateRoute from "./components/PrivateRoute";
+import Login from "./components/Login";
+import Home from "./components/Home";
+import SavedPapers from "./components/SavedPapers";
+import Events from "./components/Events";
+import DashboardPage from "./components/Dashboard";
+import Chat from "./components/Chat";
+import PageNotFound from "./components/PageNotFound";
 
 function App() {
   return (
-    <div className="app-container">
-      <header className="header">
-        <h1>Multiagent Research AI</h1>
-        <p>An experimental platform for collaborative AI research agents.</p>
-      </header>
-
-      <main className="main">
-        <button className="btn primary">Get Started</button>
-        <button className="btn secondary">Learn More</button>
-      </main>
-
-      <footer className="footer">
-        © {new Date().getFullYear()} Multiagent Research AI - Ancy Joseph
-      </footer>
-    </div>
-  )
+    <>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" />} />
+            <Route path="/login" element={<Login />} />
+            
+            <Route element={<PrivateRoute />}>
+              <Route path="/home" element={<Home />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/saved" element={<SavedPapers />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+            <Route path="*" element={<PageNotFound />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </>
+  );
 }
 
-export default App
+export default App;

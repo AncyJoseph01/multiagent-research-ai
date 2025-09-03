@@ -5,8 +5,9 @@ from datetime import datetime
 
 from app.db.database import database
 from app.db import models
-from app.schema.user import User, UserCreate
+from app.schema.user import User, UserCreate, LoginRequest
 from sqlalchemy import insert, select, update, delete
+from fastapi import Form
 
 router = APIRouter() 
 
@@ -83,3 +84,12 @@ async def delete_user(user_id: uuid.UUID):
     await database.execute(q)
 
     return {"message": "User deleted successfully"}
+
+@router.post("/login", response_model=User)
+async def login_user(request: LoginRequest):
+    normalized_email = request.email.lower()
+    query = select(models.User).where(models.User.email.ilike(normalized_email))
+    user = await database.fetch_one(query)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
