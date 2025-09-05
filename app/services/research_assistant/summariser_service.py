@@ -1,3 +1,4 @@
+import re
 import google.generativeai as genai
 from app.core.config import settings
 
@@ -13,73 +14,84 @@ def summarise_text(
     source: str = None,
 ) -> str:
     """
-    Summarise research paper text into structured research notes with a fixed template.
+    Summarise research paper text into structured research notes using a fixed template.
+    Ensures authors are included, key metrics are bolded, and the word 'structured' is removed.
     """
 
-    # Build metadata section
-    metadata = f"## Research Notes: {title or 'Unknown Title'}\n\n"
+    # Build optional metadata string to inject into the main content
+    meta_lines = []
     if authors:
-        metadata += f"*Authors:* {authors}\n"
+        meta_lines.append(f"**Authors:** {authors}")
     if institution:
-        metadata += f"*Institution(s):* {institution}\n"
+        meta_lines.append(f"**Institution(s):** {institution}")
     if arxiv_id:
-        metadata += f"*ArXiv ID:* {arxiv_id} (https://arxiv.org/abs/{arxiv_id})\n"
+        meta_lines.append(f"**ArXiv ID:** {arxiv_id} (https://arxiv.org/abs/{arxiv_id})")
     if published_at:
-        metadata += f"*Published:* {published_at}\n"
+        meta_lines.append(f"**Published:** {published_at}")
     if source:
-        metadata += f"*Source/Dataset/Challenge:* {source}\n"
-    metadata += "\n---\n\n"
+        meta_lines.append(f"**Source/Dataset/Challenge:** {source}")
+    
+    metadata = "\n".join(meta_lines)
+    if metadata:
+        metadata += "\n\n"  # spacing before main content
 
     prompt = f"""
-    You are an assistant for researchers. Summarise the following research paper
-    into structured research notes using the exact template below.
+You are an assistant for researchers. Summarise the following research paper
+into structured research notes using the exact template below.
 
-    Requirements:
-    - Always use Markdown formatting.
-    - Always include every section in the template.
-    - If a section has no information in the text, explicitly write: "No explicit information provided."
-    - Keep technical details (datasets, baselines, metrics, equations, percentages).
-    - Highlight key results (e.g., best scores) using **bold**.
-    - Use bullet points where appropriate.
+Requirements:
+- Always use Markdown formatting.
+- Include **authors** in the summary section.
+- Include every section in the template.
+- Keep technical details (datasets, baselines, metrics, equations, percentages).
+- Highlight key results and metrics (e.g., BLEU, F1, silhouette scores) using **bold**.
+- Use bullet points where appropriate.
+- Do NOT include the word "structured" anywhere in the output.
 
-    --- TEMPLATE START ---
-    {metadata}
+--- TEMPLATE START ---
+{metadata}
+## Research Notes: {title or 'Unknown Title'}
+**Authors:** {authors or "No explicit information provided."}
 
-    **Quick Takeaway and Key Insights:**  
-    [2–10 sentence simple explanation of the paper’s problem, method, and outcome]
+**Quick Takeaway and Key Insights:**  
+[2–10 sentence simple explanation of the paper’s problem, method, and outcome]
 
-    **Abstract:**  
-    [Concise technical summary]
+**Abstract:**  
+[Concise technical summary]
 
-    **Methods:**  
-    - **Preprocessing:** [...]
-    - **Model/Architecture:** [...]
-    - **Training Procedure:** [...]
-    - **Evaluation Setup:** [...]
+**Methods:**  
+- **Preprocessing:** [...]
+- **Model/Architecture:** [...]
+- **Training Procedure:** [...]
+- **Evaluation Setup:** [...]
 
-    **Findings / Results:**  
-    - **In-domain Results:**  
-      - [...]
-    - **Cross-domain / Generalization Results:**  
-      - [...]
-    - **Key Insights:**  
-      - [...]
+**Findings / Results:**  
+- **In-domain Results:**  
+  - [...]
+- **Cross-domain / Generalization Results:**  
+  - [...]
+- **Key Insights:**  
+  - [...]
 
-    **Contributions:**  
-    - [...]
+**Contributions:**  
+- [...]
 
-    **Limitations / Challenges:**  
-    - [...]
+**Limitations / Challenges:**  
+- [...]
 
-    **Future Directions:**  
-    - [...]
-    --- TEMPLATE END ---
+**Future Directions:**  
+- [...]
+--- TEMPLATE END ---
 
-    ---
-    Text to summarise:
-    {content}
-    """
+Text to summarise:
+{content}
+"""
 
     model = genai.GenerativeModel("gemini-1.5-pro")
     response = model.generate_content(prompt)
-    return response.text
+
+    # Remove any leading "structured" or accidental whitespace/newlines
+    final_text = response.text.strip()
+    final_text = re.sub(r'^\s*structured\s*[:\-]?\s*', '', final_text, flags=re.IGNORECASE)
+
+    return final_text

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException, Query
+from typing import List, Optional
 import uuid
 from datetime import datetime
 from sqlalchemy import insert, select, update, delete
@@ -52,13 +52,15 @@ async def create_paper(paper: PaperCreate):
 
 # Get all papers
 @router.get("/", response_model=List[Paper])
-async def read_papers():
+async def read_papers(user_id: Optional[uuid.UUID] = Query(None)):
     query = select(models.Paper)
+
+    if user_id:  # filter only this user's papers
+        query = query.where(models.Paper.user_id == user_id)
+
     rows = await database.fetch_all(query)
-    
-    # Create a list of Paper Pydantic models from the fetched rows
     papers = [Paper.model_validate(row) for row in rows]
-    
+
     return papers
 
 
