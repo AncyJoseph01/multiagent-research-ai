@@ -105,19 +105,27 @@ async def delete_summary(summary_id: uuid.UUID):
 
     return {"message": "Summary deleted successfully"}
 
+# @router.get("/papers/{paper_id}", response_model=List[SummarySchema])
+# async def get_summaries_for_paper(paper_id: uuid.UUID):
+#     """
+#     Retrieves all summaries associated with a specific paper ID.
+    
+#     This endpoint queries the 'summaries' table using the paper_id foreign key.
+#     """
+#     query = select(models.Summary).where(models.Summary.paper_id == paper_id)
+#     summaries = await database.fetch_all(query)
+    
+#     if not summaries:
+#         raise HTTPException(
+#             status_code=404, detail=f"No summaries found for paper_id: {paper_id}"
+#         )
+        
+#     return summaries
 @router.get("/papers/{paper_id}", response_model=List[SummarySchema])
 async def get_summaries_for_paper(paper_id: uuid.UUID):
-    """
-    Retrieves all summaries associated with a specific paper ID.
-    
-    This endpoint queries the 'summaries' table using the paper_id foreign key.
-    """
     query = select(models.Summary).where(models.Summary.paper_id == paper_id)
     summaries = await database.fetch_all(query)
-    
-    if not summaries:
-        raise HTTPException(
-            status_code=404, detail=f"No summaries found for paper_id: {paper_id}"
-        )
-        
-    return summaries
+
+    return summaries 
+
+
