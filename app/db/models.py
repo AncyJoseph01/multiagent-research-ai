@@ -28,7 +28,7 @@ class Paper(Base):
     title = Column(Text, nullable=False)
     abstract = Column(Text)
     authors = Column(Text)
-    arxiv_id = Column(String, unique=True, nullable=True)
+    arxiv_id = Column(String, unique=False, nullable=True)
     url = Column(Text, nullable=True)
     published_at = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
