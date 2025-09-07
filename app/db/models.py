@@ -15,10 +15,11 @@ class User(Base):
     name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    papers = relationship("Paper", back_populates="user")
-    tasks = relationship("Task", back_populates="user")
-    events = relationship("Event", back_populates="user")
-    history = relationship("History", back_populates="user")
+    papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    events = relationship("Event", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    history = relationship("History", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+
 
 
 class Paper(Base):
@@ -37,7 +38,9 @@ class Paper(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     user = relationship("User", back_populates="papers")
-    summaries = relationship("Summary", back_populates="paper")
+    summaries = relationship("Summary", back_populates="paper", cascade="all, delete-orphan", passive_deletes=True)
+    embeddings = relationship("Embedding", back_populates="paper", cascade="all, delete-orphan", passive_deletes=True)
+
 
 
 class Summary(Base):
@@ -52,6 +55,7 @@ class Summary(Base):
     paper = relationship("Paper", back_populates="summaries")
 
 
+# , cascade="all, delete-orphan",passive_deletes=True
 class Task(Base):
     __tablename__ = "tasks"
 
@@ -101,3 +105,4 @@ class Embedding(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     paper_id = Column(UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"))
+    paper = relationship("Paper", back_populates="embeddings")

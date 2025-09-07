@@ -131,15 +131,16 @@ async def update_paper(paper_id: uuid.UUID, updated_paper: PaperCreate):
     )
 
 
-# Delete a paper
+# Delete a paper and its related summaries and embeddings
 @router.delete("/{paper_id}")
-async def delete_paper(paper_id: uuid.UUID):
-    query = select(models.Paper).where(models.Paper.id == paper_id)
+async def delete_paper(paper_id: uuid.UUID, user_id: uuid.UUID = Query(...)):
+    query = select(models.Paper).where(models.Paper.id == paper_id, models.Paper.user_id == user_id)
     paper = await database.fetch_one(query)
     if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by this user")
 
-    q = delete(models.Paper).where(models.Paper.id == paper_id)
+    q = delete(models.Paper).where(models.Paper.id == paper_id, models.Paper.user_id == user_id)
     await database.execute(q)
 
-    return {"message": "Paper deleted successfully"}
+    return {"message": "Paper and related data deleted successfully"}
+
