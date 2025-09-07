@@ -83,7 +83,6 @@ function renderMarkdown(text) {
   return elements;
 }
 
-
 export default function SavedPapers() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +95,8 @@ export default function SavedPapers() {
   const [summaries, setSummaries] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+
+  const [deletingPaperId, setDeletingPaperId] = useState(null);
 
   const userId = useMemo(() => getUserId(user), [user]);
 
@@ -169,6 +170,38 @@ export default function SavedPapers() {
       .finally(() => setSummaryLoading(false));
   }, [selectedPaperId]);
 
+  // Delete paper
+  const handleDeletePaper = async (paperId) => {
+    if (!window.confirm("Are you sure you want to delete this paper?")) return;
+    if (!userId) return;
+
+    try {
+      setDeletingPaperId(paperId);
+      const res = await fetch(`${API_BASE}/papers/${paperId}?user_id=${userId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Delete failed: ${res.status} ${text}`);
+      }
+
+      setPapers((prev) => prev.filter((p) => p.id !== paperId));
+
+      if (selectedPaperId === paperId) {
+        setSelectedPaperId(null);
+        setSummaries([]);
+      }
+
+      alert("Paper deleted successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete paper.");
+    } finally {
+      setDeletingPaperId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navbar */}
@@ -222,24 +255,62 @@ export default function SavedPapers() {
                 <p className="text-gray-600">No papers found.</p>
               ) : (
                 <ul className="space-y-2">
-                  {papers.map((p) => (
-                    <li
-                      key={p.id}
-                      className={`p-2 rounded cursor-pointer ${
-                        p.id === selectedPaperId
-                          ? "bg-blue-100"
-                          : "hover:bg-gray-100"
-                      }`}
+                {papers.map((p) => (
+                  <li
+                    key={p.id}
+                    className={`p-2 rounded cursor-pointer flex justify-between items-center ${
+                      p.id === selectedPaperId ? "bg-blue-100" : "hover:bg-gray-100"
+                    }`}
+                    title={p.title}
+                  >
+                    {/* Paper title & authors */}
+                    <div
+                      className="flex-1 overflow-hidden"
                       onClick={() => setSelectedPaperId(p.id)}
-                      title={p.title}
                     >
                       <div className="font-medium truncate">{p.title}</div>
                       {p.authors && (
                         <div className="text-xs text-gray-600 truncate">{p.authors}</div>
                       )}
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+
+                    {/* Delete icon */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePaper(p.id);
+                      }}
+                      className={`ml-2 p-1 rounded hover:bg-red-100 ${
+                        deletingPaperId === p.id ? "cursor-not-allowed opacity-50" : "text-red-600"
+                      }`}
+                      disabled={deletingPaperId === p.id}
+                      title="Delete Paper"
+                    >
+                      {deletingPaperId === p.id ? (
+                        "..." // optional loading indicator
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6l-1 14H6L5 6"></path>
+                          <path d="M10 11v6"></path>
+                          <path d="M14 11v6"></path>
+                          <path d="M9 6V4h6v2"></path>
+                        </svg>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
               )}
             </div>
 
