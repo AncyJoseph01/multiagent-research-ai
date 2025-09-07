@@ -15,7 +15,7 @@ ARXIV_DATE_FORMATS = [
 
 logger = logging.getLogger(__name__)
 
-def fetch_arxiv_papers(keyword: str, max_results: int = 5) -> List[Dict]:
+def fetch_arxiv_papers(keyword: str, max_results: int = 1) -> List[Dict]:
     """
     Fetch papers from arXiv API by keyword.
     Returns list of dicts with paper metadata.
