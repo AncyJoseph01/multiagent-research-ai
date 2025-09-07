@@ -1,7 +1,8 @@
 import uuid
 import logging
 from fastapi import HTTPException
-from sqlalchemy import insert, update, select
+from sqlalchemy import update, select
+from sqlalchemy.dialects.postgresql import insert
 from datetime import date, datetime
 from typing import Optional
 
