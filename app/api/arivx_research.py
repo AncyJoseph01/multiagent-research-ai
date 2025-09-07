@@ -1,13 +1,12 @@
 import uuid
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from sqlalchemy import insert
-from datetime import date
-from typing import List, Optional
-from fastapi import Query
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+from datetime import datetime
 
 from app.db.database import database
-from app.db.models import Paper, Summary, Embedding
+from app.db.models import Paper, Summary
 from app.services.research_assistant import (
     arxiv_service,
     embedding_service,
@@ -15,129 +14,129 @@ from app.services.research_assistant import (
     summariser_service,
 )
 from app.schema.paper import Paper as PaperSchema
-from app.schema.summary import SummaryCreate
-from app.schema.embedding import EmbeddingCreate
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
-async def process_and_save_paper(
-    title: str,
-    abstract: str,
-    authors: str,
-    arxiv_id: str,
-    url: str,
-    published_at: date,
-    content: str,
-    user_id: uuid.UUID
-) -> PaperSchema:
-    """Helper function to process and save a paper, its summary, and embeddings."""
-    paper_id = uuid.uuid4()
-    now = datetime.utcnow()
+# ------------------------------
+# Background processing function
+# ------------------------------
+async def process_and_save_paper(paper_id: uuid.UUID, content: str):
+    """
+    Summarises text, saves summary & embeddings, and updates status.
+    """
     try:
-        logger.info(f"Starting to process paper: {title}")
+        # Check if paper exists
+        paper_exists = await database.fetch_one(select(Paper).where(Paper.id == paper_id))
+        if not paper_exists:
+            logger.warning(f"Paper {paper_id} not found. Skipping summary and embeddings.")
+            return
 
-        # Save paper metadata
-        paper_data = {
-            "id": paper_id,
-            "title": title,
-            "abstract": abstract,
-            "authors": authors,
-            "arxiv_id": arxiv_id,
-            "url": url,
-            "published_at": published_at,
-            "created_at": now,
-            "user_id": user_id,
-        }
-        await database.execute(insert(Paper).values(**paper_data))
-        logger.info(f"Saved paper metadata with ID: {paper_id}")
+        now = datetime.utcnow()
 
-        # Summarise and save content
-        logger.info("Calling summarisation service...")
-        summary_content = summariser_service.summarise_text(content)
-        
+        # Summarise
+        summary_text = summariser_service.summarise_text(content)
         summary_data = {
-            "id": uuid.uuid4(),  
+            "id": uuid.uuid4(),
             "paper_id": paper_id,
             "summary_type": "structured",
-            "content": summary_content,
-            "created_at": now, 
+            "content": summary_text,
+            "created_at": now,
         }
         await database.execute(insert(Summary).values(summary_data))
-        logger.info("Saved structured summary.")
+        logger.info(f"Saved summary for paper {paper_id}")
 
-        # --- CORRECT CODE FOR CHUNKING AND EMBEDDING ---
-        logger.info("Splitting content into chunks for embedding.")
+        # Split into chunks and embed
         chunks = pdf_service.split_text_into_chunks(content)
-
-        logger.info(f"Creating and saving embeddings for {len(chunks)} chunks.")
         await embedding_service.create_and_save_embeddings(paper_id, chunks)
+        logger.info(f"Saved embeddings for paper {paper_id}")
 
-        logger.info("Finished processing.")
-        
-        return PaperSchema(**paper_data)
+        # Update status to done
+        await database.execute(
+            update(Paper)
+            .where(Paper.id == paper_id)
+            .values(status="done")
+        )
+        logger.info(f"Paper {paper_id} marked as done")
+
     except Exception as e:
-        logger.error(f"Failed to process paper: {title}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process paper: {str(e)}")
+        logger.error(f"Processing failed for paper {paper_id}", exc_info=True)
+        # Update status to failed
+        await database.execute(
+            update(Paper)
+            .where(Paper.id == paper_id)
+            .values(status="failed")
+        )
 
-# This endpoint handles all ArXiv requests
-@router.post("/papers/arxiv", response_model=List[PaperSchema])
+# ------------------------------
+# Endpoint: Fetch Arxiv Papers
+# ------------------------------
+@router.post("/papers/arxiv", response_model=list[PaperSchema])
 async def fetch_and_summarise_arxiv_papers(
     keyword: str,
-    user_id: str = Query(..., description="UUID of the user"),
-    max_results: int = 5
+    background_tasks: BackgroundTasks,
+    user_id: str = Query(...),
+    max_results: int = 1,
 ):
-    """Fetches papers from Arxiv, summarises them, and stores the results."""
-    logger.info(f"Received request to fetch papers for keyword: '{keyword}' with max_results={max_results}")
-
-    # Validate user ID
     try:
         user_uuid = uuid.UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user_id format. Must be a UUID.")
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
 
     papers_metadata = arxiv_service.fetch_arxiv_papers(keyword, max_results)
-    logger.info(f"Found {len(papers_metadata)} papers from Arxiv.")
-
+    now = datetime.utcnow()
     saved_papers = []
+
     for paper in papers_metadata:
-        try:
-            logger.info(f"Processing paper: {paper['title']}")
-            
-            # Step 1: Download PDF
-            pdf_content = await arxiv_service.download_pdf_content(paper["pdf_url"])
-            if not pdf_content:
-                logger.warning(f"Skipping paper due to PDF download failure: {paper['title']}")
-                continue
+        paper_id = uuid.uuid4()
+        paper_data = {
+            "id": paper_id,
+            "title": paper["title"],
+            "abstract": paper["abstract"],
+            "authors": paper["authors"],
+            "arxiv_id": paper["arxiv_id"],
+            "url": paper["url"],
+            "published_at": paper["published_at"],
+            "created_at": now,
+            "user_id": user_uuid,
+            "status": "processing",
+        }
 
-            # Step 2: Extract text
-            extracted_text = pdf_service.extract_pdf_text(pdf_content)
-            if not extracted_text or extracted_text.isspace():
-                logger.warning(f"Skipping paper due to empty or unreadable text: {paper['title']}")
-                continue
-
-            # Step 3: Process and save
-            processed_paper = await process_and_save_paper(
-                title=paper["title"],
-                abstract=paper["abstract"],
-                authors=paper["authors"],
-                arxiv_id=paper["arxiv_id"],
-                url=paper["url"],
-                published_at=paper["published_at"],
-                content=extracted_text,
-                user_id=user_uuid,  # dynamic user
+        # Insert placeholder, avoiding duplicates using user_id + arxiv_id
+        await database.execute(
+            insert(Paper)
+            .values(**paper_data)
+            .on_conflict_do_update(
+                index_elements=[Paper.user_id, Paper.arxiv_id],
+                set_={
+                    "title": paper["title"],
+                    "abstract": paper["abstract"],
+                    "authors": paper["authors"],
+                    "url": paper["url"],
+                    "published_at": paper["published_at"],
+                    "status": "processing",
+                },
             )
-            saved_papers.append(processed_paper)
-            logger.info(f"Successfully processed and saved paper: {paper['title']}")
+        )
 
-        except HTTPException as e:
-            logger.error(f"HTTPException processing Arxiv paper: {paper.get('title', 'Unknown')}", exc_info=True)
-            raise e
+        saved_papers.append(PaperSchema(**paper_data))
+
+        # Start background processing only if PDF exists
+        try:
+            pdf_url = paper.get("pdf_url")
+            if pdf_url:
+                pdf_content = await arxiv_service.download_pdf_content(pdf_url)
+                if pdf_content:
+                    extracted_text = pdf_service.extract_pdf_text(pdf_content)
+                    if extracted_text and not extracted_text.isspace():
+                        background_tasks.add_task(process_and_save_paper, paper_id, extracted_text)
         except Exception as e:
-            logger.error(f"Failed to process Arxiv paper: {paper.get('title', 'Unknown')}", exc_info=True)
-            continue
+            logger.warning(f"Background task skipped for paper {paper_id}: {e}")
+            # Immediately mark as failed if PDF can't be processed
+            await database.execute(
+                update(Paper)
+                .where(Paper.id == paper_id)
+                .values(status="failed")
+            )
 
-    logger.info("Finished processing all Arxiv papers.")
     return saved_papers

@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 from datetime import datetime
-
+from sqlalchemy import UniqueConstraint
 from .database import Base
 
 class User(Base):
@@ -23,15 +23,17 @@ class User(Base):
 
 class Paper(Base):
     __tablename__ = "papers"
+    __table_args__ = (UniqueConstraint("user_id", "arxiv_id", name="unique_user_arxiv"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(Text, nullable=False)
     abstract = Column(Text)
     authors = Column(Text)
-    arxiv_id = Column(String, unique=False, nullable=True)
+    arxiv_id = Column(String, nullable=True)  # remove unique=True
     url = Column(Text, nullable=True)
     published_at = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="pending")
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     user = relationship("User", back_populates="papers")

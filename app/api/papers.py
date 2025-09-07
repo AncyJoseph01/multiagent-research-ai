@@ -34,7 +34,16 @@ async def create_paper(paper: PaperCreate):
         published_at=paper.published_at,
         created_at=datetime.utcnow(),
         user_id=paper.user_id,
-    )
+    ).on_conflict_do_update(
+    index_elements=[models.Paper.arxiv_id],
+    set_={
+        "title": paper.title,
+        "abstract": paper.abstract,
+        "authors": paper.authors,
+        "url": paper.url,
+        "published_at": paper.published_at,
+    }
+)
     await database.execute(query)
 
     return Paper(
