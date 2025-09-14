@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.db.database import database
-from app.api import arivx_research, users, papers, summaries, tasks, events, history, embeddings
+from app.api import arivx_research, users, papers, summaries, chat, embeddings
 from app.api import pdf_research
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -27,9 +27,7 @@ async def shutdown():
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(papers.router, prefix="/papers", tags=["papers"])
 app.include_router(summaries.router, prefix="/summaries", tags=["summaries"])
-app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
-app.include_router(events.router, prefix="/events", tags=["events"])
-app.include_router(history.router, prefix="/history", tags=["history"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
 app.include_router(arivx_research.router, prefix="/research", tags=["arivx_research"])
 app.include_router(pdf_research.router, prefix="/pdf_research", tags=["PDF_research"])

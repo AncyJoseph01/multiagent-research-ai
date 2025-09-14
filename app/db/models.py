@@ -16,9 +16,8 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    events = relationship("Event", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    history = relationship("History", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+
 
 
 
@@ -55,45 +54,20 @@ class Summary(Base):
     paper = relationship("Paper", back_populates="summaries")
 
 
-# , cascade="all, delete-orphan",passive_deletes=True
-class Task(Base):
-    __tablename__ = "tasks"
+class Chat(Base):
+    __tablename__ = "chat"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    description = Column(Text, nullable=False)
-    due_date = Column(DateTime, nullable=True)
-    status = Column(String, default="pending")
+    chat_session_id = Column(Integer, nullable=False, index=True) 
+    query = Column(String, nullable=False)
+    answer = Column(String, nullable=False)
+    cot_transcript = Column(Text, nullable=True)  # NEW: store internal reasoning
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="tasks")
+    user = relationship("User", back_populates="chats")
 
 
-class Event(Base):
-    __tablename__ = "events"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(Text, nullable=False)
-    description = Column(Text, nullable=True)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    external_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="events")
-
-
-class History(Base):
-    __tablename__ = "history"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    query = Column(Text, nullable=False)
-    response = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="history")
 
 
 class Embedding(Base):
