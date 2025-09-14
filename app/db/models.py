@@ -16,8 +16,6 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    events = relationship("Event", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
 
@@ -54,36 +52,6 @@ class Summary(Base):
 
     paper_id = Column(UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"))
     paper = relationship("Paper", back_populates="summaries")
-
-
-# , cascade="all, delete-orphan",passive_deletes=True
-class Task(Base):
-    __tablename__ = "tasks"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    description = Column(Text, nullable=False)
-    due_date = Column(DateTime, nullable=True)
-    status = Column(String, default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="tasks")
-
-
-class Event(Base):
-    __tablename__ = "events"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(Text, nullable=False)
-    description = Column(Text, nullable=True)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    external_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="events")
-
 
 
 class Chat(Base):

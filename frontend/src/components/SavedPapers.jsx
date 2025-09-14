@@ -215,8 +215,6 @@ export default function SavedPapers() {
               <Link to="/home" className="hover:underline">Home</Link>
               <Link to="/saved" className="hover:underline">Saved Papers</Link>
               <Link to="/chat" className="hover:underline">RAG Chat</Link>
-              <Link to="/events" className="hover:underline">Events</Link>
-              <Link to="/dashboard" className="hover:underline">Dashboard</Link>
             </div>
             <div className="flex items-center space-x-4">
               <span>Hello, {user?.userName || user?.name || "User"} 👋</span>
