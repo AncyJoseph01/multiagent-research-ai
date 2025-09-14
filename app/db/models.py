@@ -18,7 +18,8 @@ class User(Base):
     papers = relationship("Paper", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
-    history = relationship("History", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+
 
 
 
@@ -84,16 +85,21 @@ class Event(Base):
     user = relationship("User", back_populates="events")
 
 
-class History(Base):
-    __tablename__ = "history"
+
+class Chat(Base):
+    __tablename__ = "chat"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    query = Column(Text, nullable=False)
-    response = Column(Text, nullable=True)
+    chat_session_id = Column(Integer, nullable=False, index=True) 
+    query = Column(String, nullable=False)
+    answer = Column(String, nullable=False)
+    cot_transcript = Column(Text, nullable=True)  # NEW: store internal reasoning
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    user = relationship("User", back_populates="history")
+    user = relationship("User", back_populates="chats")
+
+
 
 
 class Embedding(Base):
