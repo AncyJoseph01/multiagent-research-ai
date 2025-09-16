@@ -14,6 +14,7 @@ class ChatResponse(BaseModel):
     user_id: uuid.UUID   
     query: str
     answer: str
+    cot_transcript: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

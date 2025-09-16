@@ -61,6 +61,7 @@ async def get_chat_history(session_id: int, user_id: str):
             user_id=row.user_id,
             query=row.query,
             answer=row.answer,
+            cot_transcript=row.cot_transcript,
             created_at=row.created_at or datetime.utcnow(),  # fallback
         )
         for row in rows
@@ -80,12 +81,12 @@ async def get_sessions(user_id: str):
     ORDER BY chat_session_id, created_at
     """
     rows = await database.fetch_all(query, {"user_id": user_id})
-
+    sorted_rows = sorted(rows, key=lambda r: r["created_at"] or datetime.utcnow(), reverse=True)
     return [
         chat_schema.ChatSessionInfo(
             chat_session_id=row["chat_session_id"],
             created_at=row["created_at"] or datetime.utcnow(),  # fallback
             chat_query=row["chat_query"] or "",
         )
-        for row in rows
+        for row in sorted_rows
     ]
