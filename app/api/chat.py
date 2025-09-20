@@ -5,8 +5,6 @@ from app.db import models
 from app.schema import chat as chat_schema
 from app.services.RAG_Chat.chat_service import ask_research_assistant
 from datetime import datetime
-import uuid
-
 router = APIRouter()
 
 
@@ -19,6 +17,7 @@ async def ask_chat(req: chat_schema.ChatRequest, user_id: str):
         user_id=user_id,
         query=req.query,
         session_id=session_id,
+        use_cot=req.use_cot or False,
     )
 
     query = (

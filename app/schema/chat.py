@@ -6,6 +6,7 @@ import uuid
 class ChatRequest(BaseModel):
     query: str
     chat_session_id: Optional[int] = None 
+    use_cot: Optional[bool] = False
 
 
 class ChatResponse(BaseModel):

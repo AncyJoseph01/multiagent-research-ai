@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "github-markdown-css/github-markdown-light.css";
 import SendIcon from "@mui/icons-material/Send";
+import { Switch, FormControlLabel } from "@mui/material";
 
 import {
   Box,
@@ -119,6 +120,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(false);
   const messagesEndRef = useRef(null);
+  const [useCOT, setUseCOT] = useState(false);
 
   // Fetch chat sessions
   useEffect(() => {
@@ -178,6 +180,7 @@ export default function Chat() {
       const requestBody = {
         query: input,
         chat_session_id: currentChatId,
+        use_cot: useCOT,   
       };
       const response = await axios.post(
         `http://localhost:8000/chat/?user_id=${user.userId}`,
@@ -404,14 +407,28 @@ export default function Chat() {
           </Box>
 
           <Box
-            sx={{
-              borderTop: "1px solid #ddd",
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              bgcolor: "background.paper",
-            }}
-          >
+          sx={{
+            borderTop: "1px solid #ddd",
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "background.paper",
+            gap: 1,
+          }}
+        >
+          {/* CoT toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={useCOT}
+                onChange={(e) => setUseCOT(e.target.checked)}
+              />
+            }
+            label="Enable Reasoning (CoT)"
+          />
+
+          {/* Input + Send button */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <TextField
               fullWidth
               variant="outlined"
@@ -425,7 +442,6 @@ export default function Chat() {
               onClick={handleSend}
               sx={{
                 minWidth: 0,
-                ml: 1,
                 p: 1,
                 borderRadius: "50%",
                 height: "3.5rem",
@@ -435,6 +451,8 @@ export default function Chat() {
               <SendIcon />
             </Button>
           </Box>
+        </Box>
+
         </Box>
       </Box>
     </Box>
