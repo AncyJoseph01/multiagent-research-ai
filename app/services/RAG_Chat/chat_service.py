@@ -1,10 +1,14 @@
 """
 Agentic Research Assistant:
-- Multi-stage reasoning (Exploration → Draft → Reflection → Synthesis)
-- Auto-fetches related arXiv papers (by ID or title)
-- Processes PDFs, generates embeddings, refreshes retrieval
-- Produces structured academic answers
-- Async-compatible for FastAPI
+- Multi-stage reasoning pipeline: Exploration → Draft → Reflection → Synthesis.
+- Suggests relevant arXiv papers automatically, using both IDs and titles.
+- Fetches PDFs, extracts text, splits into chunks, and generates embeddings.
+- Dynamically updates retrieval context (RAG) with newly added papers.
+- Produces structured, Markdown-formatted academic answers with references.
+- Fully asynchronous and FastAPI-compatible for scalable, responsive queries.
+- Optional Chain-of-Thought (CoT) mode for deeper reasoning and incremental insight.
+- Built-in similarity filtering ensures only relevant papers are added.
+- Maintains logs and transcripts of reasoning stages for transparency and debugging.
 """
 
 import uuid
@@ -13,8 +17,10 @@ import os
 import logging
 from typing import List
 from datetime import datetime
+import asyncio
+import numpy as np
 
-from app.db.models import Chat, Paper, Summary, Embedding
+from app.db.models import Chat, Paper, Summary
 from app.db.database import database
 from app.services.research_assistant import (
     embedding_service,
@@ -25,15 +31,22 @@ from app.services.research_assistant import (
 from app.services.RAG_Chat import retrieval_service
 import google.generativeai as genai
 
+# ----------------------------- Logger -----------------------------
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
+# ----------------------------- Config -----------------------------
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 TOP_K = 5
+SIMILARITY_THRESHOLD = 0.60
 
-# -----------------------------
-# Gemini Setup
-# -----------------------------
+# ----------------------------- Gemini Setup -----------------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("Gemini API key not set")
@@ -41,57 +54,69 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-1.5-pro")
 
-# -----------------------------
-# LLM helpers
-# -----------------------------
-def _call_gemini(prompt: str, temperature: float = 0.3) -> str:
-    response = gemini_model.generate_content(
-        prompt,
-        generation_config={"temperature": temperature, "max_output_tokens": 1200}
+# ----------------------------- LLM Helper -----------------------------
+async def _call_gemini(prompt: str, temperature: float = 0.3) -> str:
+    """Call Gemini API asynchronously."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: gemini_model.generate_content(
+            prompt,
+            generation_config={"temperature": temperature, "max_output_tokens": 1200}
+        ).text.strip()
     )
-    return response.text.strip() if response and response.text else ""
 
-
-# -----------------------------
-# Helper: Extract arXiv IDs or Titles
-# -----------------------------
+# ----------------------------- Extract arXiv IDs / Titles -----------------------------
 async def _extract_arxiv_ids_or_titles(text: str) -> List[str]:
     """
-    Extract both arXiv IDs (modern + legacy) and suggested paper titles from the LLM output.
+    Extract valid arXiv IDs and titles explicitly marked with TITLE:
+    Example output from LLM:
+      2301.12345
+      TITLE: Longformer: The Long-Document Transformer
     """
-    # Modern IDs: 2301.12345
-    # Legacy IDs: cs.AI/0301001
-    ids = re.findall(r'arXiv[:\s]?([a-zA-Z\-\.]+/\d{7}|\d{4}\.\d{4,5})', text)
-
-    # Titles (lines starting with -, •, *, or prefixed with TITLE:)
-    titles = re.findall(r'(?:-|\*|•|TITLE:)\s+["“”]?(.+?)["“”]?(?:\n|$)', text)
-
+    ids = re.findall(r'\b(\d{4}\.\d{4,5}|[a-zA-Z\-\.]+/\d{7})\b', text)
+    titles = re.findall(r'TITLE:\s*["“”]?(.+?)["“”]?(?:\n|$)', text)
     identifiers = list(set(ids + titles))
+    logger.info(f"Identifiers extracted for fetching: {identifiers}")
     return identifiers
 
+# ----------------------------- Fetch & Process Papers -----------------------------
+async def _fetch_and_process_papers(
+    identifiers: List[str],
+    user_id: str,
+    query_vector: list[float] = None
+) -> List[str]:
+    """
+    Fetch papers from arXiv, extract text, generate embeddings, save to DB.
+    Uses keyword-based relevance check instead of strict categories.
+    """
+    added_papers = []
 
-# -----------------------------
-# Helper: Fetch & process papers
-# -----------------------------
-async def _fetch_and_process_papers(papers_identifiers: List[str], user_id: str):
-    for identifier in papers_identifiers:
+    # Define keywords to check relevance
+    RELEVANT_KEYWORDS = ["transformer", "attention", "bert", "gpt", "llm", "longformer", "sparse", "routing", "language model"]
+
+    for identifier in identifiers[:5]:  # Limit top 5 suggestions for speed
+        logger.info(f"Fetching paper: {identifier}")
         papers = []
 
-        # Detect if identifier looks like an arXiv ID
+        # Detect arXiv ID
         if re.match(r'^\d{4}\.\d{4,5}$', identifier) or re.match(r'^[a-zA-Z\-\.]+/\d{7}$', identifier):
-            # Fetch by arXiv ID (exact)
-            paper_info = arxiv_service.fetch_arxiv_paper_by_id(identifier)
-            if paper_info:
-                papers = [paper_info]
+            papers = arxiv_service.fetch_arxiv_papers(identifier, max_results=1)
         else:
-            # Otherwise treat as keyword / title search
-            papers = arxiv_service.fetch_arxiv_papers(identifier, max_results=2)
+            papers = arxiv_service.fetch_arxiv_papers(identifier, max_results=1)
 
         if not papers:
+            logger.warning(f"No papers found for {identifier}")
             continue
 
         for paper_info in papers:
-            # Skip if already exists (check by canonical arXiv ID)
+            # Keyword-based relevance check
+            text_to_check = (paper_info.get("title","") + " " + paper_info.get("abstract","")).lower()
+            if not any(kw in text_to_check for kw in RELEVANT_KEYWORDS):
+                logger.info(f"Skipping paper not matching keywords: {paper_info['title']}")
+                continue
+
+            # Avoid duplicates
             existing = await database.fetch_one(
                 Paper.__table__.select().where(
                     (Paper.arxiv_id == paper_info["arxiv_id"]) & (Paper.user_id == user_id)
@@ -100,13 +125,28 @@ async def _fetch_and_process_papers(papers_identifiers: List[str], user_id: str)
             if existing:
                 continue
 
+            # Download PDF and extract text
             pdf_content = await arxiv_service.download_pdf_content(paper_info["pdf_url"])
             if not pdf_content:
                 continue
 
             text = pdf_service.extract_pdf_text(pdf_content)
-            paper_id = uuid.uuid4()
+            chunks = pdf_service.split_text_into_chunks(text, CHUNK_SIZE, CHUNK_OVERLAP)
 
+            # Optional similarity check
+            if query_vector:
+                chunk_embeddings = [embedding_service.create_embedding(c) for c in chunks[:3]]
+                sims = [
+                    float(np.dot(query_vector, np.array(e)) /
+                          (np.linalg.norm(query_vector) * np.linalg.norm(e)))
+                    for e in chunk_embeddings if e is not None
+                ]
+                if not sims or max(sims) < SIMILARITY_THRESHOLD:
+                    logger.info(f"Paper failed similarity: {paper_info['title']} (max sim {max(sims) if sims else 0})")
+                    continue
+
+            # Save paper to DB
+            paper_id = uuid.uuid4()
             await database.execute(Paper.__table__.insert().values({
                 "id": paper_id,
                 "title": paper_info["title"],
@@ -120,11 +160,9 @@ async def _fetch_and_process_papers(papers_identifiers: List[str], user_id: str)
                 "created_at": datetime.utcnow()
             }))
 
+            # Summarise
             summary_text = summariser_service.summarise_text(
-                text,
-                title=paper_info["title"],
-                authors=paper_info["authors"],
-                arxiv_id=paper_info["arxiv_id"]
+                text, title=paper_info["title"], authors=paper_info["authors"], arxiv_id=paper_info["arxiv_id"]
             )
             await database.execute(Summary.__table__.insert().values({
                 "id": uuid.uuid4(),
@@ -134,92 +172,104 @@ async def _fetch_and_process_papers(papers_identifiers: List[str], user_id: str)
                 "created_at": datetime.utcnow()
             }))
 
-            chunks = pdf_service.split_text_into_chunks(text, CHUNK_SIZE, CHUNK_OVERLAP)
+            # Save embeddings
             await embedding_service.create_and_save_embeddings(paper_id, chunks)
 
+            # Mark paper as done
             await database.execute(
                 Paper.__table__.update().where(Paper.id == paper_id).values(status="done")
             )
+            added_papers.append(paper_id)
+            logger.info(f"Paper added: {paper_info['title']}")
+
+    return added_papers
 
 
-# -----------------------------
-# Main agentic function
-# -----------------------------
-async def ask_research_assistant(user_id: str, query: str, session_id: int) -> dict:
+# ----------------------------- Main Agentic Function -----------------------------
+async def ask_research_assistant(
+    user_id: str,
+    query: str,
+    session_id: int,
+    use_cot: bool = False
+) -> dict:
     """
-    Multi-stage research assistant that fetches related papers, generates embeddings,
-    and produces structured academic answers.
+    Agentic Research Assistant:
+    - RAG + optional CoT + auto arXiv fetching
     """
-    # 1️⃣ Embed query
+    logger.info(f"Query received: {query} | use_cot={use_cot}")
     query_vector = embedding_service.create_embedding(query)
+    logger.debug(f"Query vector sample: {query_vector[:5]}...")
 
-    # 2️⃣ Retrieve initial relevant chunks
-    relevant_chunks = await retrieval_service.retrieve_similar_chunks(
-        query_vector, user_id, top_k=TOP_K
+    # Initial RAG retrieval
+    relevant_chunks = await retrieval_service.retrieve_similar_chunks(query_vector, user_id, top_k=TOP_K)
+    context_text = "\n\n".join([f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in relevant_chunks])
+    logger.info(f"Retrieved {len(relevant_chunks)} chunks from RAG")
+
+    cot_transcript = None
+
+    if use_cot:
+        # CoT stages
+        stages = ["Exploration", "Draft", "Reflection", "Synthesis"]
+
+        async def _run_stage(stage):
+            prompt = (
+        f"INTERNAL REASONING MODE [{stage}]\n"
+        f"User Query: {query}\n"
+        f"Context:\n{context_text}\n\n"
+        f"Instructions:\n"
+        f"- Think deeply about the query.\n"
+        f"- Identify gaps, limitations, and key insights.\n"
+        f"- Suggest relevant arXiv papers.\n"
+        f"- When possible, output exact arXiv IDs (format: 2403.12345).\n"
+        f"- If IDs are not available, prefix titles with 'TITLE:'.\n"
+        f"- Focus on structuring knowledge for academic output.\n"
+        f"- Include your reasoning/thought process in brackets or markdown.\n"
+        f"- Clearly separate reasoning from final suggestions for easy parsing.\n\n"
+        f"Format example:\n"
+        f"[Reasoning: Explain why these papers are relevant...]\n"
+        f"Suggested papers:\n"
+        f"2301.12345\n"
+        f"TITLE: Example Paper Title"
     )
-    context_text = "\n\n".join(
-        [f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in relevant_chunks]
-    )
+            return await _call_gemini(prompt)
 
-    # 3️⃣ Multi-stage CoT reasoning
-    stages = ["Exploration", "Draft", "Reflection", "Synthesis"]
-    stage_texts = {}
 
-    for stage in stages:
-        prompt = f"""
-INTERNAL REASONING MODE [{stage}]
-User Query: {query}
+        stage_texts = await asyncio.gather(*[_run_stage(stage) for stage in stages])
+        stage_dict = dict(zip(stages, stage_texts))
+        cot_transcript = "\n\n".join([f"## {s}\n{stage_dict[s]}" for s in stages])
 
-Context from retrieved papers:
-{context_text}
-
-Instructions:
-- Think deeply about the query.
-- Identify gaps, limitations, and key insights.
-- Suggest relevant arXiv papers.
-- When possible, output exact arXiv IDs (format: 2403.12345).
-- If IDs are not available, prefix titles with "TITLE:".
-- Focus on structuring knowledge for academic output.
-"""
-        stage_texts[stage] = _call_gemini(prompt)
-
-    # 4️⃣ Extract suggested IDs/titles from Reflection + Synthesis
-    suggested_identifiers = await _extract_arxiv_ids_or_titles(
-        stage_texts["Reflection"] + "\n" + stage_texts["Synthesis"]
-    )
-
-    # 5️⃣ Fetch, process, embed new papers if any
-    if suggested_identifiers:
-        await _fetch_and_process_papers(suggested_identifiers, user_id)
-
-        # Refresh retrieval after adding new papers
-        new_chunks = await retrieval_service.retrieve_similar_chunks(
-            query_vector, user_id, top_k=TOP_K
+        # Extract suggested papers from Reflection + Synthesis
+        suggested_identifiers = await _extract_arxiv_ids_or_titles(
+            stage_dict["Reflection"] + "\n" + stage_dict["Synthesis"]
         )
-        context_text = "\n\n".join(
-            [f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in new_chunks]
+        new_papers = await _fetch_and_process_papers(suggested_identifiers, user_id, query_vector) if suggested_identifiers else []
+        logger.info(f"New papers added: {new_papers}")
+
+        # Refresh context with new papers
+        if new_papers:
+            new_chunks = await retrieval_service.retrieve_similar_chunks(query_vector, user_id, top_k=TOP_K)
+            context_text = "\n\n".join([f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in new_chunks])
+            logger.info(f"Context updated with {len(new_chunks)} chunks including new papers")
+
+        # Final structured answer
+        final_prompt = (
+            f"EXIT INTERNAL REASONING MODE\n"
+            f"User Query: {query}\n"
+            f"Context (including new papers):\n{context_text}\n"
+            f"Instructions: Produce a structured academic answer in Markdown."
         )
+        final_answer = await _call_gemini(final_prompt)
 
-    # 6️⃣ Generate final structured answer
-    final_prompt = f"""
-EXIT INTERNAL REASONING MODE
+    else:
+        # RAG-only mode
+        final_prompt = (
+            f"User Query: {query}\n"
+            f"Context:\n{context_text}\n"
+            f"Instructions: Provide structured Markdown answer."
+        )
+        final_answer = await _call_gemini(final_prompt)
 
-User Query: {query}
-
-Context from retrieved papers (including new arXiv papers):
-{context_text}
-
-Instructions:
-- Produce structured academic answer in Markdown.
-- Include key contributions, gaps, limitations.
-- Reference relevant arXiv papers with summaries.
-"""
-    final_answer = _call_gemini(final_prompt)
-
-    # 7️⃣ Combine CoT transcript
-    cot_transcript = "\n\n".join([f"## {stage}\n{stage_texts[stage]}" for stage in stages])
-
-    # 8️⃣ Save chat to DB
+    # Save chat
     await database.execute(Chat.__table__.insert().values({
         "id": uuid.uuid4(),
         "chat_session_id": session_id,
@@ -229,5 +279,6 @@ Instructions:
         "user_id": user_id,
         "created_at": datetime.utcnow()
     }))
+    logger.info(f"Chat saved for session {session_id}")
 
     return {"answer": final_answer, "cot_transcript": cot_transcript}

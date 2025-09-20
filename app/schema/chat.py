@@ -6,6 +6,7 @@ import uuid
 class ChatRequest(BaseModel):
     query: str
     chat_session_id: Optional[int] = None 
+    use_cot: Optional[bool] = False
 
 
 class ChatResponse(BaseModel):
@@ -14,6 +15,7 @@ class ChatResponse(BaseModel):
     user_id: uuid.UUID   
     query: str
     answer: str
+    cot_transcript: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

@@ -22,7 +22,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
         - summary
         - similarity_score (cosine)
     """
-    # 1️⃣ Fetch embeddings for user's papers
+    # 1️ Fetch embeddings for user's papers
     query = (
         select(
             Embedding.id,
@@ -40,7 +40,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
     q_vec = np.array(query_vector)
     results = []
 
-    # 2️⃣ Compute cosine similarity
+    # 2️ Compute cosine similarity
     for row in rows:
         emb_vec = row["vector"]  # ✅ assign the vector here
 
@@ -61,7 +61,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
             "similarity_score": similarity
         })
 
-    # 3️⃣ Sort by similarity descending
+    # 3 Sort by similarity descending
     results.sort(key=lambda x: x["similarity_score"], reverse=True)
 
     return results[:top_k]
