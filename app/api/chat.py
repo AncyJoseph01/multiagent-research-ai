@@ -73,19 +73,21 @@ async def get_chat_history(session_id: int, user_id: str):
 @router.get("/sessions/{user_id}", response_model=list[chat_schema.ChatSessionInfo])
 async def get_sessions(user_id: str):
     query = """
-    SELECT DISTINCT ON (chat_session_id) 
-        chat_session_id, created_at, query as chat_query
-    FROM chat
-    WHERE user_id = :user_id
-    ORDER BY chat_session_id, created_at
+    SELECT c.chat_session_id,
+           MAX(c.created_at) AS created_at,
+           (ARRAY_AGG(c.query ORDER BY c.created_at DESC))[1] AS chat_query
+    FROM chat c
+    WHERE c.user_id = :user_id
+    GROUP BY c.chat_session_id
+    ORDER BY MAX(c.created_at) DESC;
     """
     rows = await database.fetch_all(query, {"user_id": user_id})
-    sorted_rows = sorted(rows, key=lambda r: r["created_at"] or datetime.utcnow(), reverse=True)
     return [
         chat_schema.ChatSessionInfo(
             chat_session_id=row["chat_session_id"],
-            created_at=row["created_at"] or datetime.utcnow(),  # fallback
+            created_at=row["created_at"] or datetime.utcnow(),
             chat_query=row["chat_query"] or "",
         )
-        for row in sorted_rows
+        for row in rows
     ]
+

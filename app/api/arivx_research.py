@@ -6,12 +6,10 @@ from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
 
 from app.db.database import database
-from app.db.models import Paper, Summary
+from app.db.models import Paper
 from app.services.research_assistant import (
     arxiv_service,
-    embedding_service,
     pdf_service,
-    summariser_service,
 )
 from app.services.research_assistant.process_and_save_paper import process_and_save_paper
 from app.schema.paper import Paper as PaperSchema
