@@ -200,18 +200,21 @@ export default function Chat() {
       }
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.isTyping
-            ? {
-                sender: "bot",
-                text:
-                  response.data.answer ||
-                  "Sorry, I couldn't process that request.",
-                cot: response.data.cot_transcript || null,
-              }
-            : msg
-        )
-      );
+      prev.map((msg, idx) =>
+        msg.isTyping
+          ? {
+              sender: "bot",
+              text:
+                response.data.answer ||
+                "Sorry, I couldn't process that request.",
+              cot: response.data.cot_transcript || null,
+            }
+          : idx === prev.length - 1 && msg.sender === "bot"
+          ? { ...msg, cot: response.data.cot_transcript || msg.cot }
+          : msg
+      )
+    );
+
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) =>
