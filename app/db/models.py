@@ -61,7 +61,7 @@ class Chat(Base):
     chat_session_id = Column(Integer, nullable=False, index=True) 
     query = Column(String, nullable=False)
     answer = Column(String, nullable=False)
-    cot_transcript = Column(Text, nullable=True)  # NEW: store internal reasoning
+    cot_transcript = Column(Text, nullable=True) 
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
