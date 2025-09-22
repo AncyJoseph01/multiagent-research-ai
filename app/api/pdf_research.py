@@ -25,7 +25,7 @@ async def process_and_save_pdf(paper_id: uuid.UUID, content: str):
 
         now = datetime.utcnow()
 
-        # 1️⃣ Summarise
+        # 1️ Summarise
         summary_text = summariser_service.summarise_text(content)
         summary_data = {
             "id": uuid.uuid4(),
@@ -37,12 +37,12 @@ async def process_and_save_pdf(paper_id: uuid.UUID, content: str):
         await database.execute(insert(Summary).values(summary_data))
         logger.info(f"Saved summary for paper {paper_id}")
 
-        # 2️⃣ Chunk & embed
+        # 2️ Chunk & embed
         chunks = pdf_service.split_text_into_chunks(content)
         await embedding_service.create_and_save_embeddings(paper_id, chunks)
         logger.info(f"Saved embeddings for paper {paper_id}")
 
-        # 3️⃣ Update status
+        # 3️ Update status
         await database.execute(
             update(Paper)
             .where(Paper.id == paper_id)
@@ -96,7 +96,7 @@ async def upload_and_summarise_pdf_paper(
 
         now = datetime.utcnow()
 
-        # 1️⃣ Check for existing paper by user + title
+        # 1️ Check for existing paper by user + title
         existing_paper = await database.fetch_one(
             select(Paper).where(Paper.user_id == user_uuid, Paper.title == title)
         )
@@ -134,13 +134,13 @@ async def upload_and_summarise_pdf_paper(
             await database.execute(insert(Paper).values(**paper_data))
             logger.info(f"Inserted new paper record: {title}")
 
-        # 2️⃣ Process summary & embeddings
+        # 2️ Process summary & embeddings
         if background_tasks:
             background_tasks.add_task(process_and_save_pdf, paper_id, extracted_text)
         else:
             await process_and_save_pdf(paper_id, extracted_text)
 
-        # 3️⃣ Return the current paper record
+        # 3️ Return the current paper record
         paper_row = await database.fetch_one(select(Paper).where(Paper.id == paper_id))
         return PaperSchema(**paper_row)
 
