@@ -64,7 +64,7 @@ export default function Home() {
     formData.append("user_id", user.userId);
 
     try {
-      const res = await fetch("${API_BASE}/pdf_research/papers/upload", {
+      const res = await fetch(`${API_BASE}/pdf_research/papers/upload`, {
         method: "POST",
         body: formData,
       });

@@ -33,7 +33,7 @@ export default function Login() {
     console.log("Logging in with:", formData);
     try {
       const response = await axios.post(
-        "${API_BASE}/users/login",
+        `${API_BASE}/users/login`,
         formData
       );
       setAlertData({
