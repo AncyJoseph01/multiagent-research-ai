@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const { login } = useAuth();
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: ""
@@ -32,7 +33,7 @@ export default function Login() {
     console.log("Logging in with:", formData);
     try {
       const response = await axios.post(
-        "http://localhost:8000/users/login",
+        "${API_BASE}/users/login",
         formData
       );
       setAlertData({

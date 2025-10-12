@@ -30,6 +30,7 @@ import ChatIcon from "@mui/icons-material/Chat";
 import CloseIcon from "@mui/icons-material/Close";
 import axios from "axios";
 
+
 // Typing Indicator
 function TypingIndicator() {
   return (
@@ -121,6 +122,7 @@ export default function Chat() {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const messagesEndRef = useRef(null);
   const [useCOT, setUseCOT] = useState(false);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   // Fetch chat sessions
   useEffect(() => {
@@ -128,7 +130,7 @@ export default function Chat() {
       setLoadingSessions(true);
       try {
         const response = await axios.get(
-          `http://localhost:8000/chat/sessions/${user.userId}`
+          `${API_BASE}/chat/sessions/${user.userId}`
         );
         setChatHistory(response.data);
       } catch (error) {
@@ -154,7 +156,7 @@ export default function Chat() {
     setCurrentChatId(chatId);
     try {
       const response = await axios.get(
-        `http://localhost:8000/chat/history/${chatId}?user_id=${user.userId}`
+        `${API_BASE}/chat/history/${chatId}?user_id=${user.userId}`
       );
       const formattedMessages = response.data.chats
         .map((chat) => [
@@ -183,7 +185,7 @@ export default function Chat() {
         use_cot: useCOT,   
       };
       const response = await axios.post(
-        `http://localhost:8000/chat/?user_id=${user.userId}`,
+        `${API_BASE}/chat/?user_id=${user.userId}`,
         requestBody
       );
 

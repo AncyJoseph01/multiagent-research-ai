@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://localhost:8000"; 
+const API_BASE = import.meta.env.VITE_API_BASE_URL; 
 
 // Normalize user ID from different possible response shapes
 function getUserId(u) {

@@ -13,6 +13,7 @@ export default function Home() {
 
   const [loadingArxiv, setLoadingArxiv] = useState(false);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   const handleLogout = () => {
     logout();
@@ -31,7 +32,7 @@ export default function Home() {
       });
 
       const res = await fetch(
-        `http://localhost:8000/research/papers/arxiv?${params.toString()}`,
+        `${API_BASE}/research/papers/arxiv?${params.toString()}`,
         { method: "POST" }
       );
 
@@ -63,7 +64,7 @@ export default function Home() {
     formData.append("user_id", user.userId);
 
     try {
-      const res = await fetch("http://localhost:8000/pdf_research/papers/upload", {
+      const res = await fetch("${API_BASE}/pdf_research/papers/upload", {
         method: "POST",
         body: formData,
       });
