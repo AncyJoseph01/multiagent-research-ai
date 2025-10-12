@@ -1,0 +1,11 @@
+FROM postgres:15
+
+# Install dependencies to build pgvector
+RUN apt-get update && \
+    apt-get install -y postgresql-server-dev-15 build-essential git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Clone pgvector and install
+RUN git clone --branch v0.6.0 https://github.com/pgvector/pgvector.git /pgvector
+WORKDIR /pgvector
+RUN make && make install
