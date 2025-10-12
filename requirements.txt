@@ -1,3 +1,15 @@
 pgvector==0.2.4
 psycopg-binary==3.1.18
 feedparser
+alembic == 1.14.1
+databases[postgresql]==0.6.1
+pydantic_settings==2.3.0
+fastapi==0.104.0
+psycopg2==2.9.6
+sqlalchemy>=1.4,<1.5
+uvicorn[standard]
+requests
+PyPDF2
+google-generativeai
+pydantic[email]
+python-multipart
