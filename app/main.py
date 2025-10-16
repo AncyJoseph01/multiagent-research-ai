@@ -9,10 +9,10 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # React dev
-        "https://meowlytics.co.uk",  # Production
-        "https://www.meowlytics.co.uk"
-    ],  
+    "https://www.meowlytics.co.uk",
+    "https://api.meowlytics.co.uk",
+    "http://localhost:5173"
+],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
