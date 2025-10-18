@@ -52,7 +52,7 @@ if not GEMINI_API_KEY:
     raise ValueError("Gemini API key not set")
 
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-pro")
+gemini_model = genai.GenerativeModel("gemini-pro")
 
 # ----------------------------- LLM Helper -----------------------------
 async def _call_gemini(prompt: str, temperature: float = 0.3) -> str:

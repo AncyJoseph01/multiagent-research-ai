@@ -87,7 +87,7 @@ Text to summarise:
 {content}
 """
 
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    model = genai.GenerativeModel("gemini-pro")
     response = model.generate_content(prompt)
 
     # Remove any leading "structured" or accidental whitespace/newlines
