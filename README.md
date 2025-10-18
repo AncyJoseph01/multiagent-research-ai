@@ -42,7 +42,7 @@ Unlike a static RAG system, this assistant can **plan**, **take decisions**, and
 
 - **Backend:** Python 3.10+, FastAPI, SQLAlchemy  
 - **Database:** PostgreSQL + [pgvector](https://github.com/pgvector/pgvector) (for embeddings)  
-- **LLM:** Google Gemini (`gemini-1.5-pro`)  
+- **LLM:** Google Gemini (`gemini-pro`)  
 - **Services:**
   - `embedding_service` → creates & saves embeddings  
   - `retrieval_service` → retrieves top-k relevant chunks  
