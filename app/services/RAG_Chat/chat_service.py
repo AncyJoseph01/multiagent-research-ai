@@ -54,6 +54,7 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-2.5-pro")
 
+
 # ----------------------------- LLM Helper -----------------------------
 async def _call_gemini(prompt: str, temperature: float = 0.3) -> str:
     """Call Gemini API asynchronously."""
