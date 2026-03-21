@@ -22,7 +22,7 @@ async def fetch_and_summarise_arxiv_papers(
     keyword: str,
     background_tasks: BackgroundTasks,
     user_id: str = Query(...),
-    max_results: int = 1,
+    max_results: int = 3,
 ):
     try:
         user_uuid = uuid.UUID(user_id)

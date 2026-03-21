@@ -16,7 +16,7 @@ if not api_key:
 genai.configure(api_key=api_key) 
 
 
-EMBEDDING_MODEL = "models/embedding-001" 
+EMBEDDING_MODEL = "models/gemini-embedding-001" 
 
 def create_embedding(text: str) -> List[float]:
     """

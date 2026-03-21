@@ -18,6 +18,7 @@ class Paper(PaperBase):
     id: uuid.UUID
     created_at: datetime
     user_id: uuid.UUID
+    match_score: Optional[float] = None
 
     class Config:
         from_attributes = True

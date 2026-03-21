@@ -52,7 +52,7 @@ if not GEMINI_API_KEY:
     raise ValueError("Gemini API key not set")
 
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.5-pro")
+gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 # ----------------------------- LLM Helper -----------------------------
@@ -196,10 +196,21 @@ async def ask_research_assistant(
     """
     Agentic Research Assistant:
     - RAG + optional CoT + auto arXiv fetching
+    - Now includes conversation history for context awareness
     """
     logger.info(f"Query received: {query} | use_cot={use_cot}")
     query_vector = embedding_service.create_embedding(query)
     logger.debug(f"Query vector sample: {query_vector[:5]}...")
+
+    # ========== FETCH CONVERSATION HISTORY ==========
+    chat_history_rows = await database.fetch_all(
+        Chat.__table__.select().where(Chat.chat_session_id == session_id).order_by(Chat.created_at.asc())
+    )
+    conversation_history = "\n".join([
+        f"User: {row['query']}\nAssistant: {row['answer'][:500]}..." if len(row['answer']) > 500 else f"User: {row['query']}\nAssistant: {row['answer']}"
+        for row in chat_history_rows[-5:]  # Last 5 messages for context
+    ])
+    history_context = f"PREVIOUS CONVERSATION:\n{conversation_history}\n\n" if conversation_history else ""
 
     # Initial RAG retrieval
     relevant_chunks = await retrieval_service.retrieve_similar_chunks(query_vector, user_id, top_k=TOP_K)
@@ -215,8 +226,9 @@ async def ask_research_assistant(
         async def _run_stage(stage):
             prompt = (
         f"INTERNAL REASONING MODE [{stage}]\n"
+        f"{history_context}"
         f"User Query: {query}\n"
-        f"Context:\n{context_text}\n\n"
+        f"Recent Context:\n{context_text}\n\n"
         f"Instructions:\n"
         f"- Think deeply about the query.\n"
         f"- Identify gaps, limitations, and key insights.\n"
@@ -255,6 +267,7 @@ async def ask_research_assistant(
         # Final structured answer
         final_prompt = (
             f"EXIT INTERNAL REASONING MODE\n"
+            f"{history_context}"
             f"User Query: {query}\n"
             f"Context (including new papers):\n{context_text}\n"
             f"Instructions: Produce a structured academic answer in Markdown."
@@ -264,9 +277,10 @@ async def ask_research_assistant(
     else:
         # RAG-only mode
         final_prompt = (
+            f"{history_context}"
             f"User Query: {query}\n"
             f"Context:\n{context_text}\n"
-            f"Instructions: Provide structured Markdown answer."
+            f"Instructions: Provide structured Markdown answer. Remember previous papers discussed in this conversation."
         )
         final_answer = await _call_gemini(final_prompt)
 

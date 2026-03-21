@@ -27,7 +27,7 @@ export default function Home() {
       const params = new URLSearchParams({
         keyword: arxivKeyword,
         user_id: user.userId,
-        max_results: "1",
+        max_results: "3",
       });
 
       const res = await fetch(
@@ -136,8 +136,18 @@ export default function Home() {
             )}
           </button>
           {arxivResults.map((paper, idx) => (
-          <li key={idx} className="border p-2 rounded">
-            <strong>{paper.title}</strong>
+          <li key={idx} className="border p-3 rounded mt-3 bg-white">
+            <div className="flex justify-between items-start mb-2">
+              <strong className="flex-1">{paper.title}</strong>
+              {paper.match_score !== undefined && (
+                <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold text-white ${
+                  paper.match_score >= 85 ? 'bg-green-500' :
+                  'bg-yellow-500'
+                }`}>
+                  {paper.match_score}% relevance
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-600">
               {Array.isArray(paper.authors)
                 ? paper.authors.join(", ")
