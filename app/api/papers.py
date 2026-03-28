@@ -3,11 +3,13 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 from sqlalchemy import insert, select, update, delete
+import logging
 
 from app.db.database import database
 from app.db import models
 from app.schema.paper import Paper, PaperCreate
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -65,9 +67,17 @@ async def read_papers(user_id: Optional[uuid.UUID] = Query(None)):
     query = select(models.Paper)
 
     if user_id:  # filter only this user's papers
+        logger.info(f"📋 Fetching papers for user_id: {user_id}")
         query = query.where(models.Paper.user_id == user_id)
+    else:
+        logger.info("📋 Fetching ALL papers (no user_id filter)")
 
     rows = await database.fetch_all(query)
+    logger.info(f"✅ Found {len(rows)} papers")
+    
+    if rows:
+        logger.info(f"📝 First paper: {rows[0]}")
+    
     papers = [Paper.model_validate(row) for row in rows]
 
     return papers

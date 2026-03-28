@@ -133,6 +133,8 @@ export default function SavedPapers() {
         return res.json();
       })
       .then((data) => {
+        console.log("[SavedPapers] API response data:", data);
+        console.log("[SavedPapers] Is array?", Array.isArray(data));
         setPapers(Array.isArray(data) ? data : []);
       })
       .catch((err) => {

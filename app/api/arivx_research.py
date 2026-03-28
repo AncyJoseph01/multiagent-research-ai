@@ -48,8 +48,10 @@ async def fetch_and_summarise_arxiv_papers(
             "status": "processing",
         }
 
+        logger.info(f"💾 Saving paper: {paper['title']} for user {user_uuid}")
+
         # Insert placeholder, avoiding duplicates using user_id + arxiv_id
-        await database.execute(
+        result = await database.execute(
             insert(Paper)
             .values(**paper_data)
             .on_conflict_do_update(
@@ -64,6 +66,8 @@ async def fetch_and_summarise_arxiv_papers(
                 },
             )
         )
+        
+        logger.info(f"✅ Paper saved with result: {result}")
 
         saved_papers.append(PaperSchema(**paper_data))
 

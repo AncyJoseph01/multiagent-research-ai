@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y build-essential libpq-dev git && rm -rf
 # Copy only requirements first to leverage Docker cache
 COPY requirements.txt .
 
+# Force cache invalidation before installing dependencies
+RUN echo "Cachebuster: $(date +%s)"
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 

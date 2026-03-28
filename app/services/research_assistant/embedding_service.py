@@ -33,6 +33,7 @@ EMBEDDING_MODEL = "models/gemini-embedding-001"
 def create_embedding(text: str) -> List[float]:
     """
     Generates a vector embedding for the given text using the Gemini API.
+    Truncates to 768 dimensions to match database schema.
     """
    
     response = genai.embed_content(
@@ -41,7 +42,14 @@ def create_embedding(text: str) -> List[float]:
         task_type="retrieval_document"
     )
     
-    return response['embedding']
+    embedding = response['embedding']
+    
+    # Truncate to 768 dimensions to match database schema
+    if len(embedding) > 768:
+        logger.debug(f"Truncating embedding from {len(embedding)} to 768 dimensions")
+        embedding = embedding[:768]
+    
+    return embedding
 
 async def create_and_save_embeddings(paper_id: uuid.UUID, chunks: List[str], rate_limit_delay: float = 0.65):
     """
