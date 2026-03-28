@@ -24,8 +24,10 @@ async def process_and_save_pdf(paper_id: uuid.UUID, content: str):
             return
 
         now = datetime.utcnow()
+        logger.info(f"Starting processing for paper {paper_id}")
 
         # 1️ Summarise
+        logger.info(f"Generating summary for paper {paper_id}...")
         summary_text = summariser_service.summarise_text(content)
         summary_data = {
             "id": uuid.uuid4(),
@@ -35,12 +37,16 @@ async def process_and_save_pdf(paper_id: uuid.UUID, content: str):
             "created_at": now,
         }
         await database.execute(insert(Summary).values(summary_data))
-        logger.info(f"Saved summary for paper {paper_id}")
+        logger.info(f"✅ Saved summary for paper {paper_id}")
 
         # 2️ Chunk & embed
+        logger.info(f"Chunking PDF for paper {paper_id}...")
         chunks = pdf_service.split_text_into_chunks(content)
+        logger.info(f"Created {len(chunks)} chunks")
+        
+        logger.info(f"Creating embeddings for paper {paper_id}...")
         await embedding_service.create_and_save_embeddings(paper_id, chunks)
-        logger.info(f"Saved embeddings for paper {paper_id}")
+        logger.info(f"✅ Saved embeddings for paper {paper_id}")
 
         # 3️ Update status
         await database.execute(
@@ -48,10 +54,10 @@ async def process_and_save_pdf(paper_id: uuid.UUID, content: str):
             .where(Paper.id == paper_id)
             .values(status="done")
         )
-        logger.info(f"Paper {paper_id} marked as done")
+        logger.info(f"✅ Paper {paper_id} marked as DONE - ready for RAG")
 
     except Exception as e:
-        logger.error(f"Processing failed for paper {paper_id}", exc_info=True)
+        logger.error(f"❌ Processing failed for paper {paper_id}: {e}", exc_info=True)
         await database.execute(
             update(Paper)
             .where(Paper.id == paper_id)

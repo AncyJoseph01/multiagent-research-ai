@@ -10,6 +10,11 @@ from sqlalchemy import select
 from app.db.models import Embedding, Paper, Summary
 from app.db.database import database
 import numpy as np
+import uuid
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 TOP_K = 5  # number of similar chunks to retrieve
 
@@ -22,6 +27,18 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
         - summary
         - similarity_score (cosine)
     """
+    # Convert user_id to UUID if it's a string
+    try:
+        if isinstance(user_id, str):
+            user_uuid = uuid.UUID(user_id)
+        else:
+            user_uuid = user_id
+    except (ValueError, TypeError):
+        logger.error(f"Invalid user_id format: {user_id}")
+        return []
+    
+    logger.debug(f"Retrieving chunks for user_id: {user_uuid}")
+    
     # 1️ Fetch embeddings for user's papers
     query = (
         select(
@@ -33,10 +50,12 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
         )
         .join(Paper, Paper.id == Embedding.paper_id)
         .outerjoin(Summary, Summary.paper_id == Paper.id)
-        .where(Paper.user_id == user_id)
+        .where(Paper.user_id == user_uuid)
     )
 
     rows = await database.fetch_all(query)
+    logger.debug(f"Found {len(rows)} embeddings for user {user_uuid}")
+    
     q_vec = np.array(query_vector)
     results = []
 
@@ -50,6 +69,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
 
         emb_vec = np.array(emb_vec)
         if emb_vec.shape != q_vec.shape:
+            logger.warning(f"Vector shape mismatch: {emb_vec.shape} vs {q_vec.shape}")
             continue
 
         similarity = float(np.dot(q_vec, emb_vec) / (np.linalg.norm(q_vec) * np.linalg.norm(emb_vec)))
@@ -63,5 +83,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
 
     # 3 Sort by similarity descending
     results.sort(key=lambda x: x["similarity_score"], reverse=True)
+    
+    logger.debug(f"Returning top {len(results[:top_k])} results with scores: {[r['similarity_score'] for r in results[:top_k]]}")
 
     return results[:top_k]

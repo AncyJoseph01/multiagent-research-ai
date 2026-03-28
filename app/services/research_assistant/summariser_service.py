@@ -1,6 +1,11 @@
 import re
+import time
+import logging
 import google.generativeai as genai
 from app.core.config import settings
+from google.api_core.exceptions import ResourceExhausted
+
+logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
@@ -87,12 +92,37 @@ Text to summarise:
 {content}
 """
 
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
-    response = model.generate_content(prompt)
+    # Retry logic for API quota limits
+    max_retries = 3
+    retry_delay = 15  # Start with 15 seconds
+    
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(prompt)
+            break  # Success, exit retry loop
+        except ResourceExhausted as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"⚠️ Quota exceeded on attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error(f"❌ Failed after {max_retries} attempts due to quota limit")
+                raise e
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}", exc_info=True)
+            raise e
 
     # Remove any leading "structured" or accidental whitespace/newlines
     final_text = response.text.strip()
     final_text = re.sub(r'^\s*structured\s*[:\-]?\s*', '', final_text, flags=re.IGNORECASE)
+    
+    # Remove template markers
+    final_text = re.sub(r'---\s*TEMPLATE\s+START\s*---', '', final_text, flags=re.IGNORECASE)
+    final_text = re.sub(r'---\s*TEMPLATE\s+END\s*---', '', final_text, flags=re.IGNORECASE)
+    
+    # Clean up extra whitespace
+    final_text = final_text.strip()
 
     return final_text

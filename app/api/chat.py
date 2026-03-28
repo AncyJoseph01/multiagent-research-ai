@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import select, delete
 from app.db.database import database
 from app.db import models
 from app.schema import chat as chat_schema
 from app.services.RAG_Chat.chat_service import ask_research_assistant
 from datetime import datetime
+import uuid
 router = APIRouter()
 
 
@@ -90,4 +91,29 @@ async def get_sessions(user_id: str):
         )
         for row in rows
     ]
+
+
+# Delete a chat session
+@router.delete("/sessions/{session_id}")
+async def delete_chat_session(session_id: int, user_id: str = Query(...)):
+    """Delete all chats in a session (cascade delete). Verifies user ownership."""
+    
+    # Verify user owns this session (check at least one chat exists for this user+session)
+    ownership_check = await database.fetch_one(
+        select(models.Chat.id).where(
+            (models.Chat.chat_session_id == session_id) & (models.Chat.user_id == user_id)
+        )
+    )
+    
+    if not ownership_check:
+        raise HTTPException(status_code=404, detail="Chat session not found or not owned by user")
+    
+    # Delete all chats in this session for this user
+    await database.execute(
+        delete(models.Chat).where(
+            (models.Chat.chat_session_id == session_id) & (models.Chat.user_id == user_id)
+        )
+    )
+    
+    return {"message": f"Chat session {session_id} deleted successfully"}
 

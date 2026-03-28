@@ -75,7 +75,7 @@ class Embedding(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chunk_id = Column(Integer, nullable=True)
-    vector = Column(Vector(768))
+    vector = Column(Vector(3072))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     paper_id = Column(UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"))

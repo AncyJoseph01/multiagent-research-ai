@@ -1,6 +1,7 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState, useRef, useEffect } from "react";
+import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "github-markdown-css/github-markdown-light.css";
@@ -27,8 +28,8 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ChatIcon from "@mui/icons-material/Chat";
+import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
-import axios from "axios";
 
 // Typing Indicator
 function TypingIndicator() {
@@ -119,6 +120,7 @@ export default function Chat() {
   ]);
   const [input, setInput] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [deletingChatId, setDeletingChatId] = useState(null);
   const messagesEndRef = useRef(null);
   const [useCOT, setUseCOT] = useState(false);
 
@@ -165,6 +167,37 @@ export default function Chat() {
       setMessages(formattedMessages);
     } catch (error) {
       console.error("Error fetching chat history:", error);
+    }
+  };
+
+  const handleDeleteChat = async (chatId, e) => {
+    e.stopPropagation(); // Prevent triggering handleChatSelect
+    if (!window.confirm("Are you sure you want to delete this chat?")) return;
+
+    try {
+      setDeletingChatId(chatId);
+      const response = await axios.delete(
+        `http://localhost:8000/chat/sessions/${chatId}?user_id=${user.userId}`
+      );
+
+      setChatHistory((prev) =>
+        prev.filter((chat) => chat.chat_session_id !== chatId)
+      );
+
+      if (currentChatId === chatId) {
+        setCurrentChatId(null);
+        setMessages([
+          {
+            sender: "bot",
+            text: "Hello! I'm your AI assistant. How can I help you today?",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      alert("Failed to delete chat.");
+    } finally {
+      setDeletingChatId(null);
     }
   };
 
@@ -330,6 +363,34 @@ export default function Chat() {
                     button
                     selected={currentChatId === chat.chat_session_id}
                     onClick={() => handleChatSelect(chat.chat_session_id)}
+                    // secondaryAction={
+                    //   <IconButton
+                    //     edge="end"
+                    //     size="small"
+                    //     onClick={(e) => handleDeleteChat(chat.chat_session_id, e)}
+                    //     disabled={deletingChatId === chat.chat_session_id}
+                    //   >
+                    //     {deletingChatId === chat.chat_session_id ? (
+                    //       <CircularProgress size={20} />
+                    //     ) : (
+                    //       <DeleteIcon fontSize="small" />
+                    //     )}
+                    //   </IconButton>
+                    // }
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={(e) => handleDeleteChat(chat.chat_session_id, e)}
+                        disabled={deletingChatId === chat.chat_session_id}
+                      >
+                        {deletingChatId === chat.chat_session_id ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <DeleteIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    }
                   >
                     <ListItemIcon>
                       <ChatIcon />
@@ -427,7 +488,7 @@ export default function Chat() {
                 onChange={(e) => setUseCOT(e.target.checked)}
               />
             }
-            label="Enable Reasoning (CoT)"
+            label="Enable Reasoning and Research more papers (CoT)"
           />
 
           {/* Input + Send button */}
