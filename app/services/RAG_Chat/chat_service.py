@@ -144,7 +144,7 @@ async def _fetch_and_process_papers(
                 chunk_embeddings = []
                 for c in chunks[:3]:  # Only check first 3 chunks
                     try:
-                        emb = embedding_service.create_embedding(c)
+                        emb = embedding_service.create_document_embedding(c)
                         chunk_embeddings.append(emb)
                         await asyncio.sleep(0.65)  # Rate limit: ~100 requests/min
                     except Exception as e:
@@ -230,7 +230,7 @@ async def ask_research_assistant(
     except Exception as e:
         logger.error(f"Error checking user papers: {e}")
     
-    query_vector = embedding_service.create_embedding(query)
+    query_vector = embedding_service.create_query_embedding(query)
     logger.debug(f"Query vector sample: {query_vector[:5]}...")
 
     # ========== FETCH ALL USER PAPERS ==========
@@ -256,7 +256,7 @@ async def ask_research_assistant(
 
     # Initial RAG retrieval
     relevant_chunks = await retrieval_service.retrieve_similar_chunks(query_vector, user_id, top_k=TOP_K)
-    context_text = "\n\n".join([f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in relevant_chunks])
+    context_text = "\n\n".join([f"Paper {c['paper_id']} chunk:\n{c['text']}" for c in relevant_chunks])
     logger.info(f"Retrieved {len(relevant_chunks)} chunks from RAG")
     
     # ⚠️ CRITICAL: Warn if no context available from RAG
@@ -340,7 +340,7 @@ async def ask_research_assistant(
             # Refresh context with new papers
             if new_papers:
                 new_chunks = await retrieval_service.retrieve_similar_chunks(query_vector, user_id, top_k=TOP_K)
-                context_text = "\n\n".join([f"Paper {c['paper_id']} summary:\n{c['summary']}" for c in new_chunks])
+                context_text = "\n\n".join([f"Paper {c['paper_id']} chunk:\n{c['text']}" for c in new_chunks])
                 logger.info(f"Context updated with {len(new_chunks)} chunks including new papers")
         
         new_papers_list = "\n".join([

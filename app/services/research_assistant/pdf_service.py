@@ -1,5 +1,6 @@
 from PyPDF2 import PdfReader
 import io
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 def extract_pdf_text(file_content: bytes) -> str:
     """
@@ -14,16 +15,18 @@ def extract_pdf_text(file_content: bytes) -> str:
 
 def split_text_into_chunks(text: str, chunk_size: int = 2000, chunk_overlap: int = 200) -> list[str]:
     """
-    Splits a long text into smaller chunks with optional overlap.
+    Splits a long text into smaller, semantically meaningful chunks with overlap.
+    Uses RecursiveCharacterTextSplitter to respect paragraphs and sentences.
     """
     if not text:
         return []
 
-    chunks = []
-    start_index = 0
-    while start_index < len(text):
-        end_index = start_index + chunk_size
-        chunks.append(text[start_index:end_index])
-        start_index += chunk_size - chunk_overlap
-        
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=len,
+        separators=["\n\n", "\n", " ", ""],  # Split by paragraph, then line, then sentence
+    )
+    
+    chunks = text_splitter.split_text(text)
     return chunks

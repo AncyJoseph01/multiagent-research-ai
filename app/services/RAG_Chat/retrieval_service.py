@@ -45,6 +45,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
             Embedding.id,
             Embedding.chunk_id,
             Embedding.paper_id,
+            Embedding.text,
             Embedding.vector,  # ✅ include the vector column
             Summary.content.label("summary_content")
         )
@@ -77,6 +78,7 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
         results.append({
             "chunk_id": row["chunk_id"],
             "paper_id": row["paper_id"],
+            "text": row["text"],
             "summary": row["summary_content"] or "",
             "similarity_score": similarity
         })

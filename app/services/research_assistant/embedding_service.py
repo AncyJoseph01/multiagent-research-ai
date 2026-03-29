@@ -30,10 +30,9 @@ genai.configure(api_key=api_key)
 
 EMBEDDING_MODEL = "models/gemini-embedding-001" 
 
-def create_embedding(text: str) -> List[float]:
+def create_document_embedding(text: str) -> List[float]:
     """
-    Generates a vector embedding for the given text using the Gemini API.
-    Truncates to 768 dimensions to match database schema.
+    Generates a vector embedding for a document chunk using the Gemini API.
     """
    
     response = genai.embed_content(
@@ -44,12 +43,23 @@ def create_embedding(text: str) -> List[float]:
     
     embedding = response['embedding']
     
-    # Truncate to 768 dimensions to match database schema
-    if len(embedding) > 768:
-        logger.debug(f"Truncating embedding from {len(embedding)} to 768 dimensions")
-        embedding = embedding[:768]
+    return embedding
+
+def create_query_embedding(text: str) -> List[float]:
+    """
+    Generates a vector embedding for a user query using the Gemini API.
+    """
+   
+    response = genai.embed_content(
+        model=EMBEDDING_MODEL,
+        content=text,
+        task_type="retrieval_query"
+    )
+    
+    embedding = response['embedding']
     
     return embedding
+
 
 async def create_and_save_embeddings(paper_id: uuid.UUID, chunks: List[str], rate_limit_delay: float = 0.65):
     """
@@ -61,10 +71,11 @@ async def create_and_save_embeddings(paper_id: uuid.UUID, chunks: List[str], rat
     
     for i, chunk in enumerate(chunks):
         try:
-            vector = create_embedding(chunk)
+            vector = create_document_embedding(chunk)
             embedding_data.append({
                 "id": uuid.uuid4(),
                 "chunk_id": i,
+                "text": chunk,
                 "vector": vector,
                 "created_at": datetime.utcnow(),
                 "paper_id": paper_id,
