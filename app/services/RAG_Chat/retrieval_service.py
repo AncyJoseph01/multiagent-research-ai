@@ -6,7 +6,7 @@ and returns relevant chunks and summaries for a given user query.
 """
 
 from typing import List, Dict, Any
-from sqlalchemy import select
+from sqlalchemy import select, String, cast
 from app.db.models import Embedding, Paper, Summary
 from app.db.database import database
 import numpy as np
@@ -41,14 +41,14 @@ async def retrieve_similar_chunks(query_vector: list[float], user_id: str, top_k
     
     # 1️ Fetch embeddings for user's papers
     query = (
-        select(
-            Embedding.id,
-            Embedding.chunk_id,
-            Embedding.paper_id,
-            Embedding.text,
-            Embedding.vector,  # ✅ include the vector column
-            Summary.content.label("summary_content")
-        )
+            select(
+        Embedding.id,
+        Embedding.chunk_id,
+        cast(Embedding.paper_id, String).label("paper_id"),
+        Embedding.text,
+        Embedding.vector,
+        Summary.content.label("summary_content")
+    )
         .join(Paper, Paper.id == Embedding.paper_id)
         .outerjoin(Summary, Summary.paper_id == Paper.id)
         .where(Paper.user_id == user_uuid)
